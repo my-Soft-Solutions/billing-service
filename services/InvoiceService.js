@@ -7,18 +7,10 @@ const InvoiceCalculationService = require('./InvoiceCalculationService');
 const InvoiceNumberService = require('./InvoiceNumberService');
 const InvoicePdfService = require('./InvoicePdfService');
 const { parsePaginationValue, getStringFilter, validationError } = require('../utils/pagination');
-const filterAllowedFields = require('../utils/filterAllowedFields');
 const validateDate = require('../utils/dateValidator');
-const { INVOICE_FIELDS } = require('../utils/allowedFields');
+const validateInvoiceData = require('../utils/validateInvoiceData');
 
 const INVOICE_STATUSES = ['draft', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled'];
-
-function requiredString(value, field) {
-    if (typeof value !== 'string' || value.trim() === '') {
-        throw validationError(`${field} is required`);
-    }
-    return value.trim();
-} 
 
 class InvoiceService {
     async findById(id, firmId, transaction) {
@@ -40,19 +32,9 @@ class InvoiceService {
     }
 
     async create(firmId, userId, data, client) {
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-            throw validationError('Request body must be a JSON object');
-        }
-        data = filterAllowedFields(data, INVOICE_FIELDS);
-        const clientId = requiredString(data.client_id, 'client_id');
-        const currency = requiredString(data.currency, 'currency').toUpperCase();
-        if (!/^[A-Z]{3}$/.test(currency)) throw validationError('currency must be a three-letter code');
-        if (data.case_id != null && typeof data.case_id !== 'string') {
-            throw validationError('case_id must be a string or null');
-        }
-        if (data.notes != null && typeof data.notes !== 'string') {
-            throw validationError('notes must be a string or null');
-        }
+        data = validateInvoiceData(data);
+        const clientId = data.client_id;
+        const currency = data.currency;
 
         const items = InvoiceItemService.prepareItems(data.items === undefined ? [] : data.items);
         const totals = InvoiceCalculationService.calculateTotals(
@@ -117,10 +99,7 @@ class InvoiceService {
     }
 
     async update(id, firmId, data) {
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-            throw validationError('Request body must be a JSON object');
-        }
-        data = filterAllowedFields(data, INVOICE_FIELDS);
+        data = validateInvoiceData(data, true);
 
         return sequelize.transaction(async transaction => {
             const invoice = await this.requireById(id, firmId, transaction);
@@ -129,11 +108,6 @@ class InvoiceService {
                 error.statusCode = 409;
                 throw error;
             }
-            const invoiceNumber = data.invoice_number === undefined
-                ? invoice.invoice_number
-                : data.invoice_number;
-            const validatedInvoiceNumber = InvoiceNumberService.validate(invoiceNumber);
-            await InvoiceNumberService.assertUnique(firmId, validatedInvoiceNumber, transaction, id);
 
             const items = data.items === undefined
                 ? invoice.items.map(item => ({
@@ -150,29 +124,14 @@ class InvoiceService {
                 data.discount_amount === undefined ? invoice.discount_amount : data.discount_amount,
                 data.tax_amount === undefined ? invoice.tax_amount : data.tax_amount
             );
-            const changes = { ...totals, invoice_number: validatedInvoiceNumber };
+            const changes = { ...totals };
 
-            if (data.client_id !== undefined) changes.client_id = requiredString(data.client_id, 'client_id');
-            if (data.case_id !== undefined) {
-                if (data.case_id !== null && typeof data.case_id !== 'string') {
-                    throw validationError('case_id must be a string or null');
-                }
-                changes.case_id = data.case_id;
-            }
+            if (data.client_id !== undefined) changes.client_id = data.client_id;
+            if (data.case_id !== undefined) changes.case_id = data.case_id;
             if (data.issue_date !== undefined) changes.issue_date = validateDate(data.issue_date, 'issue_date');
             if (data.due_date !== undefined) changes.due_date = validateDate(data.due_date, 'due_date');
-            if (data.currency !== undefined) {
-                changes.currency = requiredString(data.currency, 'currency').toUpperCase();
-                if (!/^[A-Z]{3}$/.test(changes.currency)) {
-                    throw validationError('currency must be a three-letter code');
-                }
-            }
-            if (data.notes !== undefined) {
-                if (data.notes !== null && typeof data.notes !== 'string') {
-                    throw validationError('notes must be a string or null');
-                }
-                changes.notes = data.notes;
-            }
+            if (data.currency !== undefined) changes.currency = data.currency;
+            if (data.notes !== undefined) changes.notes = data.notes;
             await invoice.update(changes, { transaction });
 
             if (data.items !== undefined) {
