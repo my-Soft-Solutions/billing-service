@@ -46,6 +46,7 @@ class InvoiceService {
 
         return sequelize.transaction(async transaction => {
             const invoiceNumber = await InvoiceNumberService.generate(firmId, transaction);
+            console.log('Generated invoice number:', invoiceNumber);
             await InvoiceNumberService.assertUnique(firmId, invoiceNumber, transaction);
             await Invoice.create({
                 id,

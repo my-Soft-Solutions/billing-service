@@ -1,0 +1,186 @@
+{
+  "info": {
+    "_postman_id": "d52f4f4a-0f65-41d9-aec5-1ef2600c961a",
+    "name": "Billing Service - Payments",
+    "description": "Payment API requests. Set the bearer token and invoiceId variables before recording a payment. The invoice must belong to the authenticated law firm and be issued, partially paid, or overdue.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Create payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"invoice_id\": \"{{invoiceId}}\",\n  \"payment_reference\": \"TXN-10001\",\n  \"payment_date\": \"2026-11-02\",\n  \"amount\": \"100.00\",\n  \"payment_method\": \"bank_transfer\",\n  \"notes\": \"Payment received\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "payments"
+          ]
+        },
+        "description": "Records a payment and updates the invoice paid amount, balance, and status."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Payment created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code === 201) {",
+              "    const payment = pm.response.json();",
+              "    if (payment.id) pm.collectionVariables.set('paymentId', payment.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List payments",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/payments?page=1&limit=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "payments"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "description": "Lists payments for the authenticated law firm."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Payments listed', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List payments by invoice",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/payments?invoice_id={{invoiceId}}&status=recorded",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "payments"
+          ],
+          "query": [
+            {
+              "key": "invoice_id",
+              "value": "{{invoiceId}}"
+            },
+            {
+              "key": "status",
+              "value": "recorded"
+            }
+          ]
+        },
+        "description": "Filters payments by invoice and status. Status can be recorded or voided."
+      }
+    },
+    {
+      "name": "Get payment",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/payments/{{paymentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "payments",
+            "{{paymentId}}"
+          ]
+        },
+        "description": "Gets a payment by ID."
+      }
+    },
+    {
+      "name": "Void payment",
+      "request": {
+        "method": "PATCH",
+        "url": {
+          "raw": "{{baseUrl}}/payments/{{paymentId}}/void",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "payments",
+            "{{paymentId}}",
+            "void"
+          ]
+        },
+        "description": "Voids a recorded payment and recalculates the related invoice balance."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    }
+  ]
+}
