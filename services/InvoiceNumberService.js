@@ -1,32 +1,37 @@
 'use strict';
 
+const { randomUUID } = require('crypto');
 const { Op } = require('sequelize');
-const { Invoice } = require('../models');
+const { Invoice, InvoiceNumberSequence } = require('../models');
 const { validationError } = require('../utils/pagination');
 
 class InvoiceNumberService {
     async generate(firmId, transaction) {
-        const year = new Date().toISOString().slice(0, 4);
-        const prefix = `INV-${year}-`;
-        const invoices = await Invoice.findAll({
-            attributes: ['invoice_number'],
-            where: {
-                law_firm_id: firmId,
-                invoice_number: { [Op.like]: `${prefix}%` }
+        const year = Number(new Date().toISOString().slice(0, 4));
+        const where = { law_firm_id: firmId, sequence_year: year };
+        await InvoiceNumberSequence.findOrCreate({
+            where,
+            defaults: {
+                id: randomUUID(),
+                ...where,
+                last_number: 0
             },
-            paranoid: false,
+            transaction
+        });
+
+        const sequence = await InvoiceNumberSequence.findOne({
+            where,
             transaction,
             lock: transaction.LOCK.UPDATE
         });
+        if (!sequence) {
+            throw new Error('Invoice number sequence could not be loaded');
+        }
 
-        const highestSequence = invoices.reduce((highest, invoice) => {
-            const match = invoice.invoice_number.match(/^INV-\d{4}-(\d+)$/);
-            if (!match) return highest;
-            const sequence = Number(match[1]);
-            return Number.isSafeInteger(sequence) ? Math.max(highest, sequence) : highest;
-        }, 0);
+        const nextNumber = BigInt(sequence.last_number) + 1n;
+        await sequence.update({ last_number: nextNumber.toString() }, { transaction });
 
-        return `${prefix}${String(highestSequence + 1).padStart(4, '0')}`;
+        return `INV-${year}-${String(nextNumber).padStart(4, '0')}`;
     }
 
     validate(invoiceNumber) {
