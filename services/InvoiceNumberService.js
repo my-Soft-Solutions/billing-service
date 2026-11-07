@@ -6,7 +6,7 @@ const { Invoice, InvoiceNumberSequence } = require('../models');
 const { validationError } = require('../utils/pagination');
 
 class InvoiceNumberService {
-    async generate(firmId, transaction) {
+    async generate(firmId, transaction, prefix = 'INV') {
         const year = Number(new Date().toISOString().slice(0, 4));
         const where = { law_firm_id: firmId, sequence_year: year };
         await InvoiceNumberSequence.findOrCreate({
@@ -31,7 +31,11 @@ class InvoiceNumberService {
         const nextNumber = BigInt(sequence.last_number) + 1n;
         await sequence.update({ last_number: nextNumber.toString() }, { transaction });
 
-        return `INV-${year}-${String(nextNumber).padStart(4, '0')}`;
+        const invoiceNumber = `${prefix}-${year}-${String(nextNumber).padStart(4, '0')}`;
+        if (invoiceNumber.length > 50) {
+            throw validationError('Generated invoice number exceeds the supported length');
+        }
+        return invoiceNumber;
     }
 
     validate(invoiceNumber) {

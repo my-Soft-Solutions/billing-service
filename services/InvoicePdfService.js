@@ -25,10 +25,12 @@ class InvoicePdfService {
             '',
             `Subtotal: ${invoice.subtotal}`,
             `Discount: ${invoice.discount_amount}`,
-            `Tax: ${invoice.tax_amount}`,
+            `Tax${invoice.tax_rate === null ? '' : ` (${invoice.tax_rate}%)`}: ${invoice.tax_amount}`,
             `Total: ${invoice.total_amount}`,
             `Paid: ${invoice.paid_amount}    Balance due: ${invoice.balance_due}`,
-            ...(invoice.notes ? ['', `Notes: ${invoice.notes}`] : [])
+            ...(invoice.notes ? ['', `Notes: ${invoice.notes}`] : []),
+            ...(invoice.payment_instructions ? ['', `Payment instructions: ${invoice.payment_instructions}`] : []),
+            ...(invoice.invoice_footer ? ['', invoice.invoice_footer] : [])
         ];
         const pages = [];
         for (let index = 0; index < lines.length; index += 48) pages.push(lines.slice(index, index + 48));

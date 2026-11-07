@@ -1,7 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { Invoice, InvoiceItem, sequelize } = require('../models');
+const { Invoice, InvoiceItem, InvoiceSetting, sequelize } = require('../models');
 const InvoiceItemService = require('./InvoiceItemService');
 const InvoiceCalculationService = require('./InvoiceCalculationService');
 const InvoiceNumberService = require('./InvoiceNumberService');
@@ -32,21 +32,51 @@ class InvoiceService {
     }
 
     async create(firmId, userId, data, client) {
-        data = validateInvoiceData(data);
-        const clientId = data.client_id;
-        const currency = data.currency;
+        data = validateInvoiceData(data, true);
 
         const items = InvoiceItemService.prepareItems(data.items === undefined ? [] : data.items);
-        const totals = InvoiceCalculationService.calculateTotals(
-            items,
-            data.discount_amount ?? '0',
-            data.tax_amount ?? '0'
-        );
         const id = randomUUID();
 
         return sequelize.transaction(async transaction => {
-            const invoiceNumber = await InvoiceNumberService.generate(firmId, transaction);
-            console.log('Generated invoice number:', invoiceNumber);
+            const settings = await InvoiceSetting.findOne({
+                where: { law_firm_id: firmId },
+                transaction
+            });
+            const invoiceData = validateInvoiceData({
+                ...data,
+                currency: data.currency === undefined
+                    ? settings && settings.default_currency
+                    : data.currency
+            });
+            const clientId = invoiceData.client_id;
+            const issueDate = validateDate(invoiceData.issue_date, 'issue_date');
+            const dueDate = invoiceData.due_date !== undefined
+                ? validateDate(invoiceData.due_date, 'due_date')
+                : settings
+                    ? this.defaultDueDate(issueDate, settings.default_due_days)
+                    : null;
+            const taxRate = invoiceData.tax_amount === undefined && settings
+                ? settings.default_tax_rate
+                : null;
+            const taxAmount = invoiceData.tax_amount !== undefined
+                ? invoiceData.tax_amount
+                : taxRate === null
+                    ? '0'
+                    : InvoiceCalculationService.calculatePercentageTax(
+                        items,
+                        invoiceData.discount_amount ?? '0',
+                        taxRate
+                    );
+            const totals = InvoiceCalculationService.calculateTotals(
+                items,
+                invoiceData.discount_amount ?? '0',
+                taxAmount
+            );
+            const invoiceNumber = await InvoiceNumberService.generate(
+                firmId,
+                transaction,
+                settings ? settings.invoice_prefix : 'INV'
+            );
             await InvoiceNumberService.assertUnique(firmId, invoiceNumber, transaction);
             await Invoice.create({
                 id,
@@ -55,20 +85,35 @@ class InvoiceService {
                 client_name: client.name,
                 client_email: client.email,
                 client_phone: client.phone,
-                case_id: data.case_id || null,
+                case_id: invoiceData.case_id || null,
                 invoice_number: invoiceNumber,
-                issue_date: validateDate(data.issue_date, 'issue_date'),
-                due_date: validateDate(data.due_date, 'due_date'),
-                currency,
+                issue_date: issueDate,
+                due_date: dueDate,
+                currency: invoiceData.currency,
+                tax_rate: taxRate,
+                payment_instructions: settings ? settings.payment_instructions : null,
+                invoice_footer: settings ? settings.invoice_footer : null,
                 ...totals,
                 status: 'draft',
-                notes: data.notes ?? null,
+                notes: invoiceData.notes === undefined
+                    ? settings ? settings.default_notes : null
+                    : invoiceData.notes,
                 created_by: userId
             }, { transaction });
 
             await InvoiceItemService.createForInvoice(id, items, transaction);
             return this.requireById(id, firmId, transaction);
         });
+    }
+
+    defaultDueDate(issueDate, dueDays) {
+        const baseDate = issueDate || new Date().toISOString().slice(0, 10);
+        const date = new Date(`${baseDate}T00:00:00.000Z`);
+        date.setUTCDate(date.getUTCDate() + Number(dueDays));
+        if (Number.isNaN(date.getTime())) {
+            throw validationError('default_due_days results in an invalid due date');
+        }
+        return date.toISOString().slice(0, 10);
     }
 
     async list(firmId, filters = {}) {
