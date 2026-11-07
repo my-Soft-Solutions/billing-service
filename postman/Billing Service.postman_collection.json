@@ -1,0 +1,453 @@
+{
+  "info": {
+    "_postman_id": "bc3945e8-c649-4d3e-b9e5-a3bd918b81f4",
+    "name": "Billing Service - API",
+    "description": "Requests for the Billing Service API. Set the bearer token and clientId variables before creating an invoice. Create billing settings first if you want invoice defaults to be applied.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Create invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"case_id\": \"\",\n  \"currency\": \"LKR\",\n  \"issue_date\": \"2026-11-06\",\n  \"due_date\": \"2026-12-06\",\n  \"discount_amount\": \"0.00\",\n  \"tax_amount\": \"0.00\",\n  \"notes\": \"Invoice created from Postman\",\n  \"items\": [\n    {\n      \"description\": \"Legal consultation\",\n      \"billing_type\": \"hourly\",\n      \"quantity\": \"2.00\",\n      \"unit_price\": \"5000.00\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ]
+            },
+            "description": "Creates a draft invoice. client_id must belong to the authenticated law firm."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invoice created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const invoice = pm.response.json();",
+                  "    if (invoice.id) pm.collectionVariables.set('invoiceId', invoice.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List invoices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/invoices?page=1&limit=20&status=draft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "draft",
+                  "description": "Optional: draft, issued, partially_paid, paid, overdue, or cancelled."
+                }
+              ]
+            },
+            "description": "Lists invoices for the authenticated law firm."
+          }
+        },
+        {
+          "name": "Get invoice",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": "Gets an invoice, including its line items."
+          }
+        },
+        {
+          "name": "Update draft invoice",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": \"LKR\",\n  \"discount_amount\": \"250.00\",\n  \"tax_amount\": \"0.00\",\n  \"notes\": \"Updated invoice notes\",\n  \"items\": [\n    {\n      \"description\": \"Legal consultation\",\n      \"billing_type\": \"hourly\",\n      \"quantity\": \"2.00\",\n      \"unit_price\": \"5000.00\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": "Updates a draft invoice. Only draft invoices can be changed."
+          }
+        },
+        {
+          "name": "Download invoice PDF",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}",
+                "pdf"
+              ]
+            },
+            "description": "Downloads the invoice as a PDF."
+          }
+        },
+        {
+          "name": "Issue invoice",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/issue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}",
+                "issue"
+              ]
+            },
+            "description": "Issues a draft invoice that has at least one line item."
+          }
+        },
+        {
+          "name": "Cancel invoice",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancels an invoice unless it is already paid or cancelled."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice_id\": \"{{invoiceId}}\",\n  \"payment_reference\": \"TXN-10001\",\n  \"payment_date\": \"2026-11-06\",\n  \"amount\": \"100.00\",\n  \"payment_method\": \"bank_transfer\",\n  \"notes\": \"Payment received\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "description": "Records a payment against an issued, partially paid, or overdue invoice. The payment cannot exceed the remaining balance."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const payment = pm.response.json();",
+                  "    if (payment.id) pm.collectionVariables.set('paymentId', payment.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List payments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/payments?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lists payments for the authenticated law firm."
+          }
+        },
+        {
+          "name": "List payments by invoice",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/payments?invoice_id={{invoiceId}}&status=recorded",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "invoice_id",
+                  "value": "{{invoiceId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "recorded",
+                  "description": "Optional: recorded or voided."
+                }
+              ]
+            },
+            "description": "Filters payments by invoice and status."
+          }
+        },
+        {
+          "name": "Get payment",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "{{paymentId}}"
+              ]
+            },
+            "description": "Gets a payment by ID."
+          }
+        },
+        {
+          "name": "Void payment",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/payments/{{paymentId}}/void",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "{{paymentId}}",
+                "void"
+              ]
+            },
+            "description": "Voids a recorded payment and recalculates the related invoice balance."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing settings",
+      "item": [
+        {
+          "name": "Get billing settings",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/billing-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing-settings"
+              ]
+            },
+            "description": "Gets billing settings for the authenticated law firm."
+          }
+        },
+        {
+          "name": "Create billing settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"default_currency\": \"LKR\",\n  \"invoice_prefix\": \"INV\",\n  \"default_due_days\": 30,\n  \"default_tax_rate\": \"0.0000\",\n  \"payment_instructions\": \"Please include the invoice number with your payment.\",\n  \"invoice_footer\": \"Thank you for your business.\",\n  \"default_notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing-settings"
+              ]
+            },
+            "description": "Creates settings for the authenticated law firm. Supported currencies are LKR, USD, and GBP."
+          }
+        },
+        {
+          "name": "Update billing settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"default_currency\": \"LKR\",\n  \"invoice_prefix\": \"INV\",\n  \"default_due_days\": 30,\n  \"default_tax_rate\": \"0.0000\",\n  \"payment_instructions\": \"Please include the invoice number with your payment.\",\n  \"invoice_footer\": \"Thank you for your business.\",\n  \"default_notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing-settings"
+              ]
+            },
+            "description": "Updates one or more settings for the authenticated law firm."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    }
+  ]
+}

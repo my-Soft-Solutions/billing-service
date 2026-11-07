@@ -76,6 +76,18 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: false
     },
+    tax_rate: {
+      type: DataTypes.DECIMAL(7, 4),
+      allowNull: true
+    },
+    payment_instructions: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    invoice_footer: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     total_amount: {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: false

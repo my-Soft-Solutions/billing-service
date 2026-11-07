@@ -28,6 +28,23 @@ class InvoiceCalculationService {
         return amountCents;
     }
 
+    calculatePercentageTax(items, discount, rate) {
+        const rateText = String(rate);
+        if (!/^\d{1,3}(?:\.\d{1,4})?$/.test(rateText)) {
+            throw validationError('default_tax_rate must be between 0 and 999.9999');
+        }
+        const [whole, fraction = ''] = rateText.split('.');
+        const rateTenThousandths = BigInt(whole) * 10000n + BigInt(fraction.padEnd(4, '0'));
+        const subtotalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+        const discountCents = this.moneyInCents(discount, 'discount_amount');
+        const taxableCents = BigInt(Math.max(0, subtotalCents - discountCents));
+        const taxCents = (taxableCents * rateTenThousandths + 500000n) / 1000000n;
+        if (taxCents > 99999999999999n) {
+            throw validationError('Tax amount exceeds the supported range');
+        }
+        return this.amountFromCents(Number(taxCents));
+    }
+
     calculateTotals(items, discount, tax) {
         const subtotalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
         const discountCents = this.moneyInCents(discount, 'discount_amount');
