@@ -6,6 +6,7 @@ const InvoiceItemService = require('./InvoiceItemService');
 const InvoiceCalculationService = require('./InvoiceCalculationService');
 const InvoiceNumberService = require('./InvoiceNumberService');
 const InvoicePdfService = require('./InvoicePdfService');
+const InvoiceAuditService = require('./InvoiceAuditService');
 const { parsePaginationValue, getStringFilter, validationError } = require('../utils/pagination');
 const validateDate = require('../utils/dateValidator');
 const validateInvoiceData = require('../utils/validateInvoiceData');
@@ -13,16 +14,17 @@ const validateInvoiceData = require('../utils/validateInvoiceData');
 const INVOICE_STATUSES = ['draft', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled'];
 
 class InvoiceService {
-    async findById(id, firmId, transaction) {
+    async findById(id, firmId, transaction, { lock } = {}) {
         return Invoice.findOne({
             where: { id, law_firm_id: firmId },
             include: [{ model: InvoiceItem, as: 'items' }],
-            transaction
+            transaction,
+            lock
         });
     }
 
-    async requireById(id, firmId, transaction) {
-        const invoice = await this.findById(id, firmId, transaction);
+    async requireById(id, firmId, transaction, options) {
+        const invoice = await this.findById(id, firmId, transaction, options);
         if (!invoice) {
             const error = new Error('Invoice not found');
             error.statusCode = 404;
@@ -102,7 +104,16 @@ class InvoiceService {
             }, { transaction });
 
             await InvoiceItemService.createForInvoice(id, items, transaction);
-            return this.requireById(id, firmId, transaction);
+            const invoice = await this.requireById(id, firmId, transaction);
+            await InvoiceAuditService.record({
+                invoiceId: id,
+                firmId,
+                userId,
+                action: 'invoice_created',
+                newValues: invoice.get({ plain: true }),
+                transaction
+            });
+            return invoice;
         });
     }
 
@@ -144,7 +155,7 @@ class InvoiceService {
         };
     }
 
-    async update(id, firmId, data) {
+    async update(id, firmId, userId, data) {
         data = validateInvoiceData(data, true);
 
         return sequelize.transaction(async transaction => {
@@ -154,6 +165,7 @@ class InvoiceService {
                 error.statusCode = 409;
                 throw error;
             }
+            const oldValues = invoice.get({ plain: true });
 
             const items = data.items === undefined
                 ? invoice.items.map(item => ({
@@ -183,11 +195,21 @@ class InvoiceService {
             if (data.items !== undefined) {
                 await InvoiceItemService.replaceForInvoice(id, items, transaction);
             }
-            return this.requireById(id, firmId, transaction);
+            const updatedInvoice = await this.requireById(id, firmId, transaction);
+            await InvoiceAuditService.record({
+                invoiceId: id,
+                firmId,
+                userId,
+                action: 'invoice_updated',
+                oldValues,
+                newValues: updatedInvoice.get({ plain: true }),
+                transaction
+            });
+            return updatedInvoice;
         });
     }
 
-    async issue(id, firmId) {
+    async issue(id, firmId, userId) {
         return sequelize.transaction(async transaction => {
             const invoice = await this.requireById(id, firmId, transaction);
             if (invoice.status !== 'draft') {
@@ -196,15 +218,32 @@ class InvoiceService {
                 throw error;
             }
             if (!invoice.items.length) throw validationError('Add at least one item before issuing an invoice');
+            const oldValues = {
+                status: invoice.status,
+                issue_date: invoice.issue_date
+            };
             await invoice.update({
                 status: 'issued',
                 issue_date: invoice.issue_date || new Date().toISOString().slice(0, 10)
             }, { transaction });
-            return this.requireById(id, firmId, transaction);
+            const issuedInvoice = await this.requireById(id, firmId, transaction);
+            await InvoiceAuditService.record({
+                invoiceId: id,
+                firmId,
+                userId,
+                action: 'invoice_issued',
+                oldValues,
+                newValues: {
+                    status: issuedInvoice.status,
+                    issue_date: issuedInvoice.issue_date
+                },
+                transaction
+            });
+            return issuedInvoice;
         });
     }
 
-    async cancel(id, firmId) {
+    async cancel(id, firmId, userId) {
         return sequelize.transaction(async transaction => {
             const invoice = await this.requireById(id, firmId, transaction);
             if (invoice.status === 'paid' || invoice.status === 'cancelled') {
@@ -212,7 +251,17 @@ class InvoiceService {
                 error.statusCode = 409;
                 throw error;
             }
+            const oldStatus = invoice.status;
             await invoice.update({ status: 'cancelled' }, { transaction });
+            await InvoiceAuditService.record({
+                invoiceId: id,
+                firmId,
+                userId,
+                action: 'invoice_cancelled',
+                oldValues: { status: oldStatus },
+                newValues: { status: invoice.status },
+                transaction
+            });
             return this.requireById(id, firmId, transaction);
         });
     }

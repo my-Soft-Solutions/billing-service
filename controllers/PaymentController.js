@@ -40,7 +40,11 @@ class PaymentController {
 
     async void(req, res) {
         try {
-            const payment = await PaymentService.void(req.params.id, req.user.firmId);
+            const payment = await PaymentService.void(
+                req.params.id,
+                req.user.firmId,
+                req.user.sub
+            );
             return res.status(200).json(payment);
         } catch (error) {
             return handleError(error, res, 'payment');

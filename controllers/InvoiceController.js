@@ -44,6 +44,7 @@ class InvoiceController {
             const invoice = await InvoiceService.update(
                 req.params.id,
                 req.user.firmId,
+                req.user.sub,
                 req.body || {}
             );
             if (!invoice) {
@@ -57,7 +58,11 @@ class InvoiceController {
 
     async issue(req, res) {
         try {
-            const invoice = await InvoiceService.issue(req.params.id, req.user.firmId);
+            const invoice = await InvoiceService.issue(
+                req.params.id,
+                req.user.firmId,
+                req.user.sub
+            );
             return res.status(200).json(invoice);
         } catch (error) {
             return handleError(error, res, 'invoice');
@@ -66,7 +71,11 @@ class InvoiceController {
 
     async cancel(req, res) {
         try {
-            const invoice = await InvoiceService.cancel(req.params.id, req.user.firmId);
+            const invoice = await InvoiceService.cancel(
+                req.params.id,
+                req.user.firmId,
+                req.user.sub
+            );
             return res.status(200).json(invoice);
         } catch (error) {
             return handleError(error, res, 'invoice');

@@ -1,7 +1,9 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { Invoice, Payment, sequelize } = require('../models');
+const { Payment, sequelize } = require('../models');
+const InvoiceService = require('./InvoiceService');
+const InvoiceAuditService = require('./InvoiceAuditService');
 const InvoiceCalculationService = require('./InvoiceCalculationService');
 const { getStringFilter, parsePaginationValue, validationError } = require('../utils/pagination');
 const {
@@ -20,16 +22,12 @@ class PaymentService {
         const paymentData = validatePaymentData(data);
 
         return sequelize.transaction(async transaction => {
-            const invoice = await Invoice.findOne({
-                where: { id: paymentData.invoice_id, law_firm_id: firmId },
+            const invoice = await InvoiceService.requireById(
+                paymentData.invoice_id,
+                firmId,
                 transaction,
-                lock: transaction.LOCK.UPDATE
-            });
-            if (!invoice) {
-                const error = new Error('Invoice not found');
-                error.statusCode = 404;
-                throw error;
-            }
+                { lock: transaction.LOCK.UPDATE }
+            );
             if (!['issued', 'partially_paid', 'overdue'].includes(invoice.status)) {
                 const error = new Error('Payments can only be recorded for issued invoices');
                 error.statusCode = 409;
@@ -43,6 +41,11 @@ class PaymentService {
                 throw validationError('amount cannot exceed the invoice balance');
             }
 
+            const oldInvoiceValues = {
+                status: invoice.status,
+                paid_amount: invoice.paid_amount,
+                balance_due: invoice.balance_due
+            };
             const payment = await Payment.create({
                 id: randomUUID(),
                 law_firm_id: firmId,
@@ -57,11 +60,25 @@ class PaymentService {
             }, { transaction });
 
             const paidCents = currentPaidCents + paymentData.amountCents;
-            await invoice.update({
+            const updatedInvoiceValues = {
                 paid_amount: InvoiceCalculationService.amountFromCents(paidCents),
                 balance_due: InvoiceCalculationService.amountFromCents(totalCents - paidCents),
                 status: invoiceStatusForBalance(invoice, paidCents, totalCents)
-            }, { transaction });
+            };
+            await invoice.update(updatedInvoiceValues, { transaction });
+            await InvoiceAuditService.record({
+                invoiceId: invoice.id,
+                firmId,
+                userId,
+                action: 'payment_recorded',
+                oldValues: oldInvoiceValues,
+                newValues: {
+                    payment: payment.get({ plain: true }),
+                    invoice: updatedInvoiceValues
+                },
+                metadata: { payment_id: payment.id },
+                transaction
+            });
 
             return payment;
         });
@@ -97,7 +114,7 @@ class PaymentService {
         };
     }
 
-    async void(id, firmId) {
+    async void(id, firmId, userId) {
         return sequelize.transaction(async transaction => {
             const payment = await Payment.findOne({
                 where: { id, law_firm_id: firmId },
@@ -115,17 +132,19 @@ class PaymentService {
                 throw error;
             }
 
-            const invoice = await Invoice.findOne({
-                where: { id: payment.invoice_id, law_firm_id: firmId },
+            const invoice = await InvoiceService.requireById(
+                payment.invoice_id,
+                firmId,
                 transaction,
-                lock: transaction.LOCK.UPDATE
-            });
-            if (!invoice) {
-                const error = new Error('Invoice not found');
-                error.statusCode = 404;
-                throw error;
-            }
+                { lock: transaction.LOCK.UPDATE }
+            );
 
+            const oldPaymentValues = payment.get({ plain: true });
+            const oldInvoiceValues = {
+                status: invoice.status,
+                paid_amount: invoice.paid_amount,
+                balance_due: invoice.balance_due
+            };
             await payment.update({ status: 'voided' }, { transaction });
             const recordedPayments = await Payment.findAll({
                 where: {
@@ -142,13 +161,30 @@ class PaymentService {
             );
             const totalCents = cents(invoice.total_amount, 'invoice total');
 
-            await invoice.update({
+            const updatedInvoiceValues = {
                 paid_amount: InvoiceCalculationService.amountFromCents(paidCents),
                 balance_due: InvoiceCalculationService.amountFromCents(totalCents - paidCents),
                 status: invoice.status === 'cancelled'
                     ? 'cancelled'
                     : invoiceStatusForBalance(invoice, paidCents, totalCents)
-            }, { transaction });
+            };
+            await invoice.update(updatedInvoiceValues, { transaction });
+            await InvoiceAuditService.record({
+                invoiceId: invoice.id,
+                firmId,
+                userId,
+                action: 'payment_voided',
+                oldValues: {
+                    payment: oldPaymentValues,
+                    invoice: oldInvoiceValues
+                },
+                newValues: {
+                    payment: payment.get({ plain: true }),
+                    invoice: updatedInvoiceValues
+                },
+                metadata: { payment_id: payment.id },
+                transaction
+            });
 
             return payment;
         });
