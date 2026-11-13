@@ -5,6 +5,7 @@ const { Payment, sequelize } = require('../models');
 const InvoiceService = require('./InvoiceService');
 const InvoiceAuditService = require('./InvoiceAuditService');
 const InvoiceCalculationService = require('./InvoiceCalculationService');
+const PaymentReceiptPdfService = require('./PaymentReceiptPdfService');
 const { getStringFilter, parsePaginationValue, validationError } = require('../utils/pagination');
 const {
     PAYMENT_STATUSES,
@@ -16,6 +17,26 @@ const {
 class PaymentService {
     async findById(id, firmId) {
         return Payment.findOne({ where: { id, law_firm_id: firmId } });
+    }
+
+    async receipt(id, firmId) {
+        const payment = await this.findById(id, firmId);
+        if (!payment) {
+            const error = new Error('Payment not found');
+            error.statusCode = 404;
+            throw error;
+        }
+        if (payment.status !== 'recorded') {
+            const error = new Error('Only recorded payments can have a receipt');
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const invoice = await InvoiceService.requireById(payment.invoice_id, firmId);
+        return {
+            payment,
+            document: PaymentReceiptPdfService.generate(payment, invoice)
+        };
     }
 
     async create(firmId, userId, data) {
