@@ -44,4 +44,15 @@ jobs:
               body: `Automatically created for branch ${branch}.`
             });
 
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: [
+                branch.startsWith("feature/")
+                  ? "feature"
+                  : "bugfix"
+              ]
+            });
+
             console.log("Pull request created successfully.");
