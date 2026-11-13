@@ -113,6 +113,32 @@ describe('PaymentService', () => {
         });
     });
 
+    it('generates a receipt only for a recorded payment in the requesting firm', async () => {
+        const result = await PaymentService.receipt('payment-1', 'firm-1');
+
+        assert.equal(result.payment, state.payment);
+        assert.ok(Buffer.isBuffer(result.document));
+        assert.deepEqual(state.paymentLookup.where, {
+            id: 'payment-1',
+            law_firm_id: 'firm-1'
+        });
+        assert.deepEqual(state.invoiceLookupArgs, ['invoice-1', 'firm-1']);
+    });
+
+    it('rejects receipts for missing or voided payments', async () => {
+        state.payment = null;
+        await assert.rejects(
+            PaymentService.receipt('missing', 'firm-1'),
+            error => error.statusCode === 404
+        );
+
+        state.payment = makePayment({ status: 'voided' });
+        await assert.rejects(
+            PaymentService.receipt('payment-1', 'firm-1'),
+            error => error.statusCode === 409
+        );
+    });
+
     it('records a partial payment and updates invoice balance and status', async () => {
         const payment = await PaymentService.create(
             'firm-1',

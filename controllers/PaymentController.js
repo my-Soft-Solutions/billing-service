@@ -38,6 +38,21 @@ class PaymentController {
         }
     }
 
+    async receipt(req, res) {
+        try {
+            const { payment, document } = await PaymentService.receipt(
+                req.params.id,
+                req.user.firmId
+            );
+            return res
+                .type('application/pdf')
+                .attachment(`payment-receipt-${payment.id}.pdf`)
+                .send(document);
+        } catch (error) {
+            return handleError(error, res, 'payment');
+        }
+    }
+
     async void(req, res) {
         try {
             const payment = await PaymentService.void(
