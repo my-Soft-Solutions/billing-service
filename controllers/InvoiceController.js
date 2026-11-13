@@ -69,6 +69,20 @@ class InvoiceController {
         }
     }
 
+    async sendEmail(req, res) {
+        try {
+            const invoice = await InvoiceService.sendEmail(
+                req.params.id,
+                req.user.firmId,
+                req.user.sub,
+                req.headers.authorization
+            );
+            return res.status(200).json(invoice);
+        } catch (error) {
+            return handleError(error, res, 'invoice');
+        }
+    }
+
     async cancel(req, res) {
         try {
             const invoice = await InvoiceService.cancel(

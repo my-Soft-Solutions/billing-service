@@ -1,0 +1,146 @@
+{
+  "info": {
+    "_postman_id": "bd6f7439-f371-4fe1-91aa-99a2df369101",
+    "name": "Billing Service - Reports",
+    "description": "Report endpoints for the authenticated law firm. Set the bearer token before sending requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Total invoiced",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/invoiced",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "invoiced"]
+        },
+        "description": "Returns invoiced totals grouped by currency."
+      }
+    },
+    {
+      "name": "Total payments received",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/payments",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "payments"]
+        },
+        "description": "Returns recorded payments grouped by currency."
+      }
+    },
+    {
+      "name": "Total outstanding balance",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/outstanding",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "outstanding"]
+        },
+        "description": "Returns outstanding balances grouped by currency."
+      }
+    },
+    {
+      "name": "Monthly revenue",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/monthly-revenue",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "monthly-revenue"]
+        },
+        "description": "Returns recorded payment revenue grouped by payment month and invoice currency."
+      }
+    },
+    {
+      "name": "Client-wise billing",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/clients",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "clients"]
+        },
+        "description": "Returns invoiced and outstanding amounts grouped by client and currency."
+      }
+    },
+    {
+      "name": "Case-wise billing",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/cases",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "cases"]
+        },
+        "description": "Returns invoiced and outstanding amounts grouped by case and currency."
+      }
+    },
+    {
+      "name": "Unpaid invoices",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/unpaid-invoices?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "unpaid-invoices"],
+          "query": [
+            {"key": "page", "value": "1"},
+            {"key": "limit", "value": "20"}
+          ]
+        },
+        "description": "Returns unpaid invoices. Pagination supports page and limit (maximum 100)."
+      }
+    },
+    {
+      "name": "Overdue invoices",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/overdue-invoices?page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "overdue-invoices"],
+          "query": [
+            {"key": "page", "value": "1"},
+            {"key": "limit", "value": "20"}
+          ]
+        },
+        "description": "Returns overdue invoices. Pagination supports page and limit (maximum 100)."
+      }
+    },
+    {
+      "name": "Tax summary",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reports/tax-summary",
+          "host": ["{{baseUrl}}"],
+          "path": ["reports", "tax-summary"]
+        },
+        "description": "Returns subtotal, discount, tax, and total invoiced grouped by currency."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ]
+}

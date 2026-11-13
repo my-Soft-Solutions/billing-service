@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
+const emailApiClient = require('../config/axios');
 const { Invoice, InvoiceItem, InvoiceSetting, sequelize } = require('../models');
 const InvoiceItemService = require('./InvoiceItemService');
 const InvoiceCalculationService = require('./InvoiceCalculationService');
@@ -240,6 +241,74 @@ class InvoiceService {
                 transaction
             });
             return issuedInvoice;
+        });
+    }
+
+    async sendEmail(id, firmId, userId, authorization) {
+        const invoice = await this.requireById(id, firmId);
+        if (invoice.status === 'draft' || invoice.status === 'cancelled') {
+            const error = new Error('Only active invoices can be emailed');
+            error.statusCode = 409;
+            throw error;
+        }
+        if (invoice.email_sent) {
+            const error = new Error('Invoice email has already been sent');
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const pdf = InvoicePdfService.generate(invoice);
+        try {
+            emailApiClient.setAuthorizationHeader(authorization);
+            await emailApiClient.post(
+                process.env.INVOICE_EMAIL_API_URL || 'http://localhost:3000/api/v1/emails/send',
+                {
+                    to: invoice.client_email,
+                    subject: `Invoice ${invoice.invoice_number}`,
+                    text: `Please find invoice ${invoice.invoice_number} for ${invoice.currency} ${invoice.total_amount}.`,
+                    invoice: invoice.get({ plain: true }),
+                    attachments: [{
+                        filename: `invoice-${invoice.invoice_number}.pdf`,
+                        contentType: 'application/pdf',
+                        encoding: 'base64',
+                        content: pdf.toString('base64')
+                    }]
+                }
+            );
+        } catch (cause) {
+            console.error('Invoice email API request failed:', cause.message);
+            const error = new Error('Invoice email API request failed');
+            error.statusCode = 502;
+            throw error;
+        } finally {
+            emailApiClient.setAuthorizationHeader(null);
+        }
+
+        return sequelize.transaction(async transaction => {
+            const currentInvoice = await this.requireById(id, firmId, transaction);
+            const oldValues = {
+                email_sent: currentInvoice.email_sent,
+                email_sent_at: currentInvoice.email_sent_at
+            };
+            const emailSentAt = new Date();
+            await currentInvoice.update({
+                email_sent: true,
+                email_sent_at: emailSentAt
+            }, { transaction });
+            const updatedInvoice = await this.requireById(id, firmId, transaction);
+            await InvoiceAuditService.record({
+                invoiceId: id,
+                firmId,
+                userId,
+                action: 'invoice_email_sent',
+                oldValues,
+                newValues: {
+                    email_sent: updatedInvoice.email_sent,
+                    email_sent_at: updatedInvoice.email_sent_at
+                },
+                transaction
+            });
+            return updatedInvoice;
         });
     }
 
