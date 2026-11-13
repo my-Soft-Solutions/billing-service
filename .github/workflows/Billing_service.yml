@@ -1,15 +1,14 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
 
 name: Billing Service CI
 
 on:
   push:
-    branches: 
+    branches:
       - main
       - develop
       - "feature/**"
       - "bugfix/**"
+
   pull_request:
     branches:
       - main
@@ -20,7 +19,7 @@ jobs:
     name: Run Billing Service Tests
     runs-on: ubuntu-latest
 
-  steps:
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
