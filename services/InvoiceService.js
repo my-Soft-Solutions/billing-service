@@ -308,7 +308,7 @@ class InvoiceService {
                 },
                 transaction
             });
-            return updatedInvoice;
+            return updatedInvoice  ;
         });
     }
 
