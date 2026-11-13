@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "bc3945e8-c649-4d3e-b9e5-a3bd918b81f4",
     "name": "Billing Service - API",
-    "description": "Requests for the Billing Service API. Set the bearer token and clientId variables before creating an invoice. Create billing settings first if you want invoice defaults to be applied.",
+    "description": "Complete request collection for the Billing Service API. Set the bearer token, clientId, and invoiceId variables as needed. The service must have MAIN_API_URL configured for client verification and INVOICE_EMAIL_API_URL configured for invoice emails.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -184,6 +184,44 @@
           }
         },
         {
+          "name": "Send invoice email",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/send-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}",
+                "send-email"
+              ]
+            },
+            "description": "Emails an active invoice to its client with the invoice PDF attached through the configured INVOICE_EMAIL_API_URL. On success, the response includes email_sent and email_sent_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invoice email sent', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const invoice = pm.response.json();",
+                  "    pm.test('Invoice is marked as sent', function () {",
+                  "        pm.expect(invoice.email_sent).to.eql(true);",
+                  "        pm.expect(invoice.email_sent_at).to.be.ok;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Cancel invoice",
           "request": {
             "method": "PATCH",
@@ -199,6 +237,39 @@
               ]
             },
             "description": "Cancels an invoice unless it is already paid or cancelled."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoice audit logs",
+      "item": [
+        {
+          "name": "List audit logs for invoice",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/audit-logs/{{invoiceId}}/audit-logs?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit-logs",
+                "{{invoiceId}}",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lists paginated audit events for an invoice in the authenticated law firm."
           }
         }
       ]
@@ -423,6 +494,184 @@
               ]
             },
             "description": "Updates one or more settings for the authenticated law firm."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Total invoiced",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/invoiced",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "invoiced"
+              ]
+            },
+            "description": "Returns invoiced totals grouped by currency."
+          }
+        },
+        {
+          "name": "Total payments received",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "payments"
+              ]
+            },
+            "description": "Returns recorded payments grouped by currency."
+          }
+        },
+        {
+          "name": "Total outstanding balance",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/outstanding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "outstanding"
+              ]
+            },
+            "description": "Returns outstanding balances grouped by currency."
+          }
+        },
+        {
+          "name": "Monthly revenue",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/monthly-revenue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "monthly-revenue"
+              ]
+            },
+            "description": "Returns recorded payment revenue grouped by payment month and invoice currency."
+          }
+        },
+        {
+          "name": "Client-wise billing",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "clients"
+              ]
+            },
+            "description": "Returns invoiced and outstanding amounts grouped by client and currency."
+          }
+        },
+        {
+          "name": "Case-wise billing",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/cases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "cases"
+              ]
+            },
+            "description": "Returns invoiced and outstanding amounts grouped by case and currency."
+          }
+        },
+        {
+          "name": "Unpaid invoices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/unpaid-invoices?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "unpaid-invoices"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Returns unpaid invoices. Pagination supports page and limit up to 100."
+          }
+        },
+        {
+          "name": "Overdue invoices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/overdue-invoices?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "overdue-invoices"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Returns overdue invoices. Pagination supports page and limit up to 100."
+          }
+        },
+        {
+          "name": "Tax summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/tax-summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "tax-summary"
+              ]
+            },
+            "description": "Returns subtotal, discount, tax, and total invoiced grouped by currency."
           }
         }
       ]

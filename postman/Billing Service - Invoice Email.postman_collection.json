@@ -1,0 +1,72 @@
+{
+  "info": {
+    "_postman_id": "748771cc-b490-41e9-9031-2465fe59a1ae",
+    "name": "Billing Service - Invoice Email",
+    "description": "Sends an issued invoice to its client with the invoice PDF attached through the configured email API. Set the bearer token and invoiceId variables before sending. On success, the invoice response includes email_sent and email_sent_at.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Send invoice email",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/invoices/{{invoiceId}}/send-email",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "invoices",
+            "{{invoiceId}}",
+            "send-email"
+          ]
+        },
+        "description": "Sends the invoice PDF to the client's email address as an attachment. Draft and cancelled invoices cannot be sent, and an invoice already marked as sent cannot be sent again."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Invoice email sent', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code === 200) {",
+              "    const invoice = pm.response.json();",
+              "    pm.test('Invoice is marked as sent', function () {",
+              "        pm.expect(invoice.email_sent).to.eql(true);",
+              "        pm.expect(invoice.email_sent_at).to.be.ok;",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    }
+  ]
+}

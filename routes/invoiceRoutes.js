@@ -14,6 +14,7 @@ router.get('/:id/pdf', InvoiceController.pdf);
 router.get('/:id', InvoiceController.get);
 router.put('/:id', verifyClient(), InvoiceController.update);
 router.patch('/:id/issue', InvoiceController.issue);
+router.post('/:id/send-email', InvoiceController.sendEmail);
 router.patch('/:id/cancel', InvoiceController.cancel);
 
 module.exports = router;
